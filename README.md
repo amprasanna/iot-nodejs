@@ -1,7 +1,7 @@
 Node.js Client Library
 ========================
 
-The node.js client is used for simplifying the interacting with the IBM Watson Internet of Things Platform. The following libraries contain instructions and guidance on using the nodejs ibmiotf node to interact with devices and applications within your organizations.
+The node.js client is used for simplifying the interaction with the IBM Watson Internet of Things Platform. The following libraries contain instructions and guidance on using the nodejs ibmiotf node to interact with devices and applications within your organizations.
 
 This client library is divided into three parts, Device, ManagedDevice and Application. The Devices section contains information on how devices publish events and handle commands using the nodejs ibmiotf module, ManagedDevice section contains information on how you can manage the device. More information on device management can be found [here.](https://docs.internetofthings.ibmcloud.com/reference/device_mgmt.html). The Applications section contains information on how applications can use the nodejs ibmiotf module to interact with devices.
 
@@ -23,21 +23,44 @@ All code is written in [JavaScript 6](https://babeljs.io/docs/learn-es2015/) and
 
 Usage
 =======
-Load the library in node.js / browserify
+Load the library in node.js
 -------------------------------------------
 
 ```JavaScript
 var Client = require('ibmiotf');
 ```
 
+**Note:** When this client library is used in the Node.js environment, it will use tcp/tls. But if a user wants to use websockets in Node.js, the user must add a new property `enforce-ws` in the configuration.
+
+
 Load the library in browser
 ------------------------------
+**Note**: From version 0.2.34, the user must build the library using the below command to get the necessary javascript files to use the library in browser.
 
-load `iotf-client-bundle.js` or `iotf-client-bundle-min.js` from the `dist` directory
+```JavaScript
+npm run build
+```
 
+Load the generated javascript file - `iotf-client-bundle.js` or `iotf-client-bundle-min.js` from the `dist` directory to your web application. Check out the [sample](https://github.com/ibm-watson-iot/iot-nodejs/tree/master/samples/WebApplicationSample) on how to use the generated library in your web application. 
 
-**Note:** Library used in Node.js will use tcp/ssl and websockets when the library is used in browser. But if user wants to use websockets in Node.js, the user must add a new property `enforce-ws` in the configuration.
+Supported Features
+------------------
 
+| Feature   |      Supported?      |
+|----------|:-------------:|
+| Device connectivity |  &#10004; |
+| Gateway connectivity |    &#10004;   |
+| Application connectivity | &#10004; |
+| Watson IoT API | &#10004; |
+| SSL/TLS | &#10004; |
+| Client side Certificate based authentication | &#10004; |
+| Device Management | &#10004; |
+| Device Management Extension(DME) | &#10008; |
+| Scalable Application | &#10004; |
+| Auto reconnect | &#10004; |
+| Websocket | &#10004; |
+| Event/Command publish using MQTT| &#10004; |
+| Event/Command publish using HTTP| &#10004; |
 
 Devices
 ===============================
@@ -49,8 +72,8 @@ events from the device and subscribe to commands.
 Constructor
 -----------
 
-The constructor builds the device client instance. It accepts an
-configuration json containing the following :
+The constructor builds the device client instance. It accepts a
+configuration JSON containing the following:
 
 -   org - Your organization ID
 -   type - The type of your device
@@ -58,8 +81,14 @@ configuration json containing the following :
 -   auth-method - Method of authentication (the only value currently
     supported is “token”)
 -   auth-token - API key token (required if auth-method is “token”)
--   domain - (Optional)The messaging endpoint URL. By default the value is "internetofthings.ibmcloud.com"(Watson IoT Production server).
+-   domain - (Optional)The messaging endpoint URL. By default, the value is "internetofthings.ibmcloud.com"(Watson IoT Production server).
 -   enforce-ws - (Optional)Enforce Websocket when using the library in Node.js
+-   use-client-certs - (Optional) Enforces use of client side certificates when specified as true
+-   server-ca - (Optional) Specifies the custom server certificate signed using device key
+-   client-ca - (Mandatory when use-client-certs:true) Specifies the path to device-client CA certificate
+-   client-cert - (Mandatory when use-client-certs:true) Specifies the path to device-client certificate
+-   client-key - (Mandatory when use-client-certs:true) Specifies the path to device-client key
+-   client-key-passphrase - (Optional) Specifies the passphrase for the device-client key if exists
 
 If you want to use quickstart, then enter only the first three properties.
 
@@ -79,6 +108,28 @@ var deviceClient = new Client.IotfDevice(config);
 ....
 ```
 
+If you want to use registered mode with Client Side Certificates, you need to have use-client-certs defined to true and client-ca, client-cert and client-key referring to appropriate paths as shown below:
+
+``` {.sourceCode .javascript}
+var Client = require("ibmiotf");
+var config = {
+    "org" : "organization",
+    "id" : "deviceId",
+    "domain": "internetofthings.ibmcloud.com",
+    "type" : "deviceType",
+    "auth-method" : "token",
+    "auth-token" : "authToken",
+    "use-client-certs": [true / false],
+    "server-ca": "path to custom server certificate", # Optional, if there is custom server certificate, then can be used
+    "client-ca": "path to device-client ca certificate",
+    "client-cert": "path to device-client certificate",
+    "client-key": "path to device-client key"
+};
+
+var deviceClient = new Client.IotfDevice(config);
+
+....
+```
 Connect
 -------
 
@@ -101,8 +152,8 @@ After the successful connection to the IoTF service, the device client
 emits *connect* event. So all the device logic can be implemented inside
 this callback function.
 
-The Device Client automatically tries to reconnect when it loses connection. 
-When the reconnection is successful, the client emits *reconnect* event. 
+The Device Client automatically tries to reconnect when it loses connection.
+When the reconnection is successful, the client emits *reconnect* event.
 
 
 Logging
@@ -162,6 +213,26 @@ deviceClient.on("connect", function () {
     deviceClient.publish("status","json",'{"d" : { "cpu" : 60, "mem" : 50 }}', myQosLevel);
 });
 
+....
+```
+
+The device events can also be sent using HTTP instead of JSON.
+
+``` {.sourceCode .javascript}
+
+var deviceClient = new Client.IotfDevice(config);
+
+//setting the log level to trace. By default its 'warn'
+deviceClient.log.setLevel('debug');
+
+deviceClient.publishHTTPS('myevt', 'json', '{"value": 23 }').then(function onSuccess (argument) {
+    console.log("Success");
+    console.log(argument);
+}, function onError (argument) {
+
+    console.log("Fail");
+    console.log(argument);
+});
 ....
 ```
 
@@ -310,8 +381,8 @@ After the successful connection to the IoTF service, the application
 client emits *connect* event. So all the logic can be implemented inside
 this callback function.
 
-The Application Client automatically tries to reconnect when it loses connection. 
-When the reconnection is successful, the client emits *reconnect* event. 
+The Application Client automatically tries to reconnect when it loses connection.
+When the reconnection is successful, the client emits *reconnect* event.
 
 Logging
 --------
@@ -621,6 +692,33 @@ appClient.on("connect", function () {
 });
 ```
 
+Publishing events from devices(via HTTP)
+-----------------------------------------
+
+Applications can publish events as if they originated from a Device. This method uses HTTP instead of MQTT to send messages
+
+-   DeviceType
+-   Device ID
+-   Event Type
+-   Format
+-   Data
+
+Supported formats for data are text, JSON and XML. The 'Content-Type' will be set as application/json or application/xml
+
+``` {.sourceCode .javascript}
+var appClient = new Client.IotfApplication(appClientConfig);
+
+    appClient.publishHTTPS("raspi", "pi01", "eventType", "json", { d : { 'temp' : 32}}). then (function onSuccess (argument) {
+        console.log("Success");
+        console.log(argument);
+    }, function onError (argument) {
+
+        console.log("Fail");
+        console.log(argument);
+    });
+
+```
+
 Publishing commands to devices
 ------------------------------
 
@@ -686,6 +784,12 @@ configuration json containing the following :
 -   auth-token - API key token (required if auth-method is “token”)
 -   domain - (Optional)The messaging endpoint URL. By default the value is "internetofthings.ibmcloud.com"(Watson IoT Production server).
 -   enforce-ws - (Optional)Enforce Websocket when using the library in Node.js
+-   use-client-certs - (Optional) Enforces use of client side certificates when specified as true
+-   server-ca - (Optional) Specifies the custom server certificate signed using gateway key
+-   client-ca - (Mandatory when use-client-certs:true) Specifies the path to gateway-client CA certificate
+-   client-cert - (Mandatory when use-client-certs:true) Specifies the path to gateway-client certificate
+-   client-key - (Mandatory when use-client-certs:true) Specifies the path to gateway-client key
+-   client-key-passphrase - (Optional) Specifies the passphrase for the gateway-client key if exists
 
 ``` {.sourceCode .javascript}
 var Client = require("ibmiotf");
@@ -695,7 +799,12 @@ var config = {
     "id" : "gatewayId",
     "domain": "internetofthings.ibmcloud.com",
     "auth-method" : "token",
-    "auth-token" : "authToken"
+    "auth-token" : "authToken",
+    "use-client-certs": [true / false],
+    "server-ca": "path to custom server certificate", # Optional, if there is custom server certificate, then can be used
+    "client-ca": "path to gateway-client ca certificate",
+    "client-cert": "path to gateway-client certificate",
+    "client-key": "path to gateway-client key"
 };
 
 var gatewayClient = new iotf.IotfGateway(config);
@@ -723,8 +832,8 @@ gatewayClient.on('connect', function(){
 After the successful connection to the platform, the gateway client
 emits *connect* event. So all the programming logic can be implemented inside this callback function.
 
-The Gateway Client automatically tries to reconnect when it loses connection. 
-When the reconnection is successful, the client emits *reconnect* event. 
+The Gateway Client automatically tries to reconnect when it loses connection.
+When the reconnection is successful, the client emits *reconnect* event.
 
 Logging
 --------
@@ -788,7 +897,7 @@ gatewayClient.on('connect', function(){
 
 ##### Publish Device Events
 
-The Gateway can publish the device events on behalf of the device that are connected to the Gateway. Function *publishDeviceEvent* needs device Type and the Device Id to publish the device events.
+The Gateway can publish the device events on behalf of the device that is connected to the Gateway. Function *publishDeviceEvent* needs device Type and the Device Id to publish the device events.
 
 ``` {.sourceCode .javascript}
 

@@ -21,6 +21,7 @@
    Contributors:
    Tim-Daniel Jacobi - Initial Contribution
    Jeffrey Dare
+   Lokesh Haralakatta - Added Client Side Certificates Support
    *****************************************************************************
    *
    */
@@ -75,13 +76,24 @@
       }
 
       this.domainName = "internetofthings.ibmcloud.com";
+      this.mqttServer = "";
       this.enforceWs = false;
-      // Parse Domain property
-      if ((0, _utilUtilJs.isDefined)(config.domain)) {
-        if (!(0, _utilUtilJs.isString)(config.domain)) {
+      // Parse mqtt-server & domain property. mqtt-server takes precedence over domain
+      if ((0, _utilUtilJs.isDefined)(config['mqtt-server'])) {
+        if (!(0, _utilUtilJs.isString)(config['mqtt-server'])) {
+          throw new Error('[BaseClient:constructor] mqtt-server must be a string');
+        }
+        this.mqttServer = config['mqtt-server'];
+      } else if ((0, _utilUtilJs.isDefined)(config['domain'])) {
+        if (!(0, _utilUtilJs.isString)(config['domain'])) {
           throw new Error('[BaseClient:constructor] domain must be a string');
         }
+        this.mqttServer = config.org + ".messaging." + config.domain;
         this.domainName = config.domain;
+        config['mqtt-server'] = this.mqttServer;
+      } else {
+        this.mqttServer = config.org + ".messaging.internetofthings.ibmcloud.com";
+        config['mqtt-server'] = this.mqttServer;
       }
 
       //property to enforce Websockets even in Node
@@ -120,16 +132,13 @@
 
         if ((0, _utilUtilJs.isNode)() && !this.enforceWs) {
 
-          this.host = "ssl://" + config.org + ".messaging." + this.domainName + ":8883";
+          this.host = "ssl://" + this.mqttServer + ":8883";
         } else {
-          this.host = "wss://" + config.org + ".messaging." + this.domainName + ":8883";
+          this.host = "wss://" + this.mqttServer + ":8883";
         }
 
         this.isQuickstart = false;
-        this.mqttConfig = {
-          password: config['auth-token'],
-          rejectUnauthorized: true
-        };
+        this.mqttConfig = (0, _utilUtilJs.initializeMqttConfig)(config);
 
         if ((0, _utilUtilJs.isNode)()) {
           this.mqttConfig.caPaths = [__dirname + '/IoTFoundation.pem'];
