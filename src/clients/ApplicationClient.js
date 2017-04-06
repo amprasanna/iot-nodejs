@@ -349,6 +349,8 @@ export default class ApplicationClient extends BaseClient {
         ? "/api/v0002"
         : format("https://%s/api/v0002", this.httpServer);
 
+      console.log(uri);
+
       if(Array.isArray(paths)){
         for(var i = 0, l = paths.length; i < l; i++){
           uri += '/'+paths[i];
